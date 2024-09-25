@@ -1,39 +1,25 @@
 {
-    "data": [
-      {
-        "buildings": [
-          {
-            "id": 1,
-            "name": "Building 1(Blossom Heights)",
-            "latitude": 17.4470042,
-            "longitude": 78.3810862,
-            "radius": 5.0,
-            "radiusUnit": "meter",
-            "assets": [
-              {
-                  "id": 101,
-                "assetsName": "Assets 1(Conference Hall)",
-                "latitude": 17.4470362,
-                "longitude": 78.3811563,
-                "radius": 1.0
-              },
-              {
-                  "id": 102,
-                "assetsName": "Assets 2(RK Sir Cabin)",
-                "latitude": 17.447003,
-                "longitude":  78.3811143,
-                "radius": 1.0
-              },
-              {
-                  "id": 103,
-                "assetsName": "Assets 3(MD Cabin)",
-                "latitude": 17.4469637,
-                "longitude": 78.3811912,
-                "radius": 3.0
-              }
-            ]
-          }
-        ]
-      }
-    ]
-  }
+  "data": [
+    {
+      "buildings": [
+        {
+          "id": 1,
+          "name": "Building 1(Blossom Heights)",
+          "latitude": 28.59206355998397,
+          "longitude": 77.20054265539258,
+          "radius": 10.0,
+          "radiusUnit": "meter",
+          "assets": [
+            {
+              "id": 101,
+              "assetsName": "Assets 1(Conference Hall)",
+              "latitude": 28.59206355998397,
+              "longitude": 77.20054265539258,
+              "radius": 1.0
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

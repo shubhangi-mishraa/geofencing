@@ -1,11 +1,14 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:geofence_service/geofence_service.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:intl/intl.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter/services.dart' show rootBundle;
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() => runApp(const CheckInApp());
 
@@ -29,7 +32,7 @@ class _CheckInAppState extends State<CheckInApp> {
     printDevLog: false,
   );
 
-  late List<Geofence> _geofenceList = []; 
+  late List<Geofence> _geofenceList = [];
   double? _distanceFromGeofence;
   String? _currentCoordinates;
 
@@ -37,7 +40,7 @@ class _CheckInAppState extends State<CheckInApp> {
   void initState() {
     super.initState();
     checkPermissionStatus();
-    _loadGeofences(); 
+    _loadGeofences();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _geofenceService
           .addGeofenceStatusChangeListener(_onGeofenceStatusChanged);
@@ -46,11 +49,80 @@ class _CheckInAppState extends State<CheckInApp> {
     });
 
     _getUserDistanceFromGeofence();
+    Timer.periodic(const Duration(seconds: 5), (timer) {
+      _getUserLocation();
+    });
+  }
+
+  Future<void> initializeService() async {
+    final service = FlutterBackgroundService();
+
+    await service.configure(
+      androidConfiguration: AndroidConfiguration(
+        onStart: onStart,
+        autoStart: true,
+        isForegroundMode: true,
+        notificationChannelId: 'my_foreground',
+        initialNotificationTitle: 'Geofence Service',
+        initialNotificationContent: 'Tracking geofences',
+        foregroundServiceNotificationId: 888,
+      ),
+      iosConfiguration: IosConfiguration(
+        autoStart: true,
+        onForeground: onStart,
+      ),
+    );
+
+    service.startService();
+  }
+
+  void onStart(ServiceInstance service) async {
+    DartPluginRegistrant.ensureInitialized();
+
+    Timer.periodic(const Duration(seconds: 10), (timer) async {
+      Position position = await Geolocator.getCurrentPosition();
+      await checkGeofenceStatus(position);
+    });
+  }
+
+  Future<void> checkGeofenceStatus(Position position) async {
+    final geofenceList = await loadGeofences();
+
+    for (var geofence in geofenceList) {
+      double distance = Geolocator.distanceBetween(
+        position.latitude,
+        position.longitude,
+        geofence.latitude,
+        geofence.longitude,
+      );
+
+      if (distance < geofence.radius.first.length) {
+        await updateCheckInTime(geofence.id);
+      } else {
+        await updateCheckOutTime(geofence.id);
+      }
+    }
+  }
+
+  Future<void> updateCheckInTime(String geofenceId) async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    String checkInTime =
+        DateFormat('dd/MM/yyyy HH:mm:ss').format(DateTime.now());
+    prefs.setString('check_in_time_$geofenceId', checkInTime);
+    print("checkInTime :: $checkInTime");
+
+  }
+
+  Future<void> updateCheckOutTime(String geofenceId) async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    String checkOutTime =
+        DateFormat('dd/MM/yyyy HH:mm:ss').format(DateTime.now());
+    prefs.setString('check_out_time_$geofenceId', checkOutTime);
+    print("checkOutTime :: $checkOutTime");
   }
 
   Future<void> getPermission() async {
-    if (await Permission.location.request().isGranted) {
-    }
+    if (await Permission.location.request().isGranted) {}
   }
 
   Future<void> checkPermissionStatus() async {
@@ -109,6 +181,8 @@ class _CheckInAppState extends State<CheckInApp> {
             'Lat: ${position.latitude}, Lng: ${position.longitude}';
       });
 
+      print('Current User Location: $_currentCoordinates');
+
       if (_geofenceList.isNotEmpty) {
         final geofence = _geofenceList[0];
         _calculateDistanceFromGeofence(position.latitude, position.longitude,
@@ -119,6 +193,29 @@ class _CheckInAppState extends State<CheckInApp> {
     }
   }
 
+  Future<List<Geofence>> loadGeofences() async {
+    return _geofenceList;
+  }
+
+  Future<void> _getUserLocation() async {
+    try {
+      Position position = await Geolocator.getCurrentPosition();
+      setState(() {
+        _currentCoordinates =
+            'Lat: ${position.latitude}, Lng: ${position.longitude}';
+      });
+
+      print('Updated User Location: $_currentCoordinates');
+
+      if (_geofenceList.isNotEmpty) {
+        final geofence = _geofenceList[0];
+        _calculateDistanceFromGeofence(position.latitude, position.longitude,
+            geofence.latitude, geofence.longitude);
+      }
+    } catch (e) {
+      print('Error fetching user location: $e');
+    }
+  }
   Future<void> _onGeofenceStatusChanged(
       Geofence geofence,
       GeofenceRadius geofenceRadius,
@@ -137,7 +234,7 @@ class _CheckInAppState extends State<CheckInApp> {
           'geofenceId': geofence.id,
           'time': formattedTime,
         });
-        _distanceFromGeofence = null; 
+        _distanceFromGeofence = null;
       });
     } else if (geofenceStatus == GeofenceStatus.EXIT) {
       setState(() {
